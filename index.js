@@ -1,46 +1,48 @@
 const express = require("express");
 const crypto = require("crypto");
-const fetch = require("node-fetch");
-require("dotenv").config();
+const bodyParser = require("body-parser");
 
 const app = express();
-app.use(express.json());
+app.use(bodyParser.json());
 
+// Environment variables (set in Heroku Config Vars)
 const SFMC_URL = process.env.SFMC_URL;
-const SIGNING_KEY = process.env.SIGNING_KEY;
-const PORT = process.env.PORT || 3000;
+const SECRET_KEY = process.env.SECRET_KEY;
 
-app.post("/webhook", async (req, res) => {
+app.get("/", (req, res) => {
+  res.send("✅ Data Cloud → SFMC Webhook Listener is running successfully.");
+});
+
+app.post("/datacloud", async (req, res) => {
   try {
     const payload = JSON.stringify(req.body);
-    const incomingSignature = req.header("X-SFDC-Signature");
-
-    const computedSignature = crypto
-      .createHmac("sha256", SIGNING_KEY)
+    const signature = crypto
+      .createHmac("sha256", SECRET_KEY)
       .update(payload)
       .digest("base64");
 
-    if (computedSignature !== incomingSignature) {
-      console.log("❌ Signature verification failed!");
-      return res.status(401).json({ status: "error", message: "Invalid signature" });
-    }
+    console.log("Received payload:", payload);
+    console.log("Generated signature:", signature);
 
-    console.log("✅ Signature verified, forwarding to SFMC...");
-
+    // Send to SFMC endpoint
     const response = await fetch(SFMC_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-signature": signature,
+      },
       body: payload,
     });
 
-    const sfmcResponse = await response.text();
-    console.log("📩 SFMC Response:", sfmcResponse);
+    const responseText = await response.text();
+    console.log("Response from SFMC:", responseText);
 
-    res.status(200).json({ status: "success", message: "Payload verified and sent to SFMC" });
-  } catch (error) {
-    console.error("❗ Error:", error);
-    res.status(500).json({ status: "error", message: error.message });
+    res.status(200).json({ message: "Payload forwarded to SFMC", status: "success" });
+  } catch (err) {
+    console.error("Error:", err);
+    res.status(500).json({ message: "Server error", error: String(err) });
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Middleware running on port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
