@@ -1,9 +1,9 @@
 const express = require("express");
 const crypto = require("crypto");
-const bodyParser = require("body-parser");
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const app = express();
-app.use(bodyParser.json());
+app.use(express.json({ limit: "5mb" }));
 
 // Environment variables (set in Heroku Config Vars)
 const SFMC_URL = process.env.SFMC_URL;
@@ -16,6 +16,7 @@ app.get("/", (req, res) => {
 app.post("/datacloud", async (req, res) => {
   try {
     const payload = JSON.stringify(req.body);
+
     const signature = crypto
       .createHmac("sha256", SECRET_KEY)
       .update(payload)
@@ -24,7 +25,6 @@ app.post("/datacloud", async (req, res) => {
     console.log("Received payload:", payload);
     console.log("Generated signature:", signature);
 
-    // Send to SFMC endpoint
     const response = await fetch(SFMC_URL, {
       method: "POST",
       headers: {
