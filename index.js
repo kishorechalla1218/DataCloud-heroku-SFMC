@@ -1,6 +1,6 @@
 const express = require("express");
 const crypto = require("crypto");
-const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
+const fetch = require("node-fetch");
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
